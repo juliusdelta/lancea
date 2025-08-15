@@ -1,14 +1,13 @@
 use serde_json::json;
 use tokio::time::{timeout, Duration};
 use futures_lite::stream::StreamExt;
-use zbus::{connection, proxy};
+use zbus::{connection, proxy,MatchRule, MessageStream, message::Type as MsgType,};
 
+#[cfg(test)]
 #[tokio::test]
 async fn emoji_search_returns_results() {
-    // Build a local (private) session bus and attach our server to it
     let server_conn = connection::Builder::session().unwrap().build().await.unwrap();
 
-    // Serve engined at a unique name/path on the local connection
     let engine = lancea_bus::EngineBus::new();
     server_conn.object_server().at("/org/lancea/Engine1", engine).await.unwrap();
     server_conn.request_name("org.lancea.Engine1").await.unwrap();
@@ -32,7 +31,16 @@ async fn emoji_search_returns_results() {
     let v: serde_json::Value = serde_json::from_str(&resolved).unwrap();
     assert!(v["data"]["matched"].as_bool().unwrap());
 
-    let mut signals = proxy.receive_signal("ResultsUpdated").await.unwrap();
+    let rule = MatchRule::builder()
+        .msg_type(MsgType::Signal)
+        .interface("org.lancea.Engine1").unwrap()
+        .member("ResultsUpdated").unwrap()
+        .path("/org/lancea/Engine1").unwrap()
+        .build();
+
+    let mut stream = MessageStream::for_match_rule(rule, &server_conn, Some(2))
+        .await
+        .expect("failed to create MessageStream");
 
     let search_env = json!({
         "v": "1.0",
@@ -43,12 +51,12 @@ async fn emoji_search_returns_results() {
     });
     let _token: u64 = proxy.call("Search", &(search_env.to_string())).await.unwrap();
 
-    let msg = timeout(Duration::from_secs(4), signals.next())
+    let msg = timeout(Duration::from_secs(4), stream.next())
         .await
         .expect("signal timeout")
         .expect("stream ended unexpectedly");
 
-    let (epoch, provider_id, token, batch_json): (u64, String, u64, String) = msg.body().deserialize().unwrap();
+    let (epoch, provider_id, token, batch_json): (u64, String, u64, String) = msg.unwrap().body().deserialize().unwrap();
 
     assert_eq!(provider_id, "emoji");
     assert_eq!(token, 1);

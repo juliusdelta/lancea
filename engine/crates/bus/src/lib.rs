@@ -1,10 +1,9 @@
 //! D‑Bus surface & orchestration glue (stubs for M0).
 
-use std::cmp::Ordering;
 use std::sync::atomic::AtomicU64;
 
 use anyhow::Result;
-use lancea_model::{Envelope, Outcome, Preview, ResolvedCommand, ResultItem, ResultsBatch};
+use lancea_model::{Envelope, Outcome, ResolvedCommand, ResultItem, ResultsBatch};
 use lancea_provider_emoji::EmojiProvider;
 use lancea_registry::CommandRegistry;
 use serde_json::json;
@@ -58,6 +57,7 @@ impl EngineBus {
         #[zbus(signal_emitter)]
         emitter: SignalEmitter<'_>,
     ) -> u64 {
+        dbg!("Called search with args: {}", args_json);
         let args: Envelope<serde_json::Value> = serde_json::from_str(args_json).unwrap_or_else(|_| Envelope { v: "1.0".into(), data: json!({}) });
         let text = args.data.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
         let epoch = args.data.get("epoch").and_then(|v| v.as_u64()).unwrap_or_else(|| self.next_epoch());
@@ -67,13 +67,14 @@ impl EngineBus {
 
         let reset_batch = Envelope::wrap(ResultsBatch::Reset { items });
         let reset_json = serde_json::to_string(&reset_batch).unwrap();
+
         let _ = Self::results_updated(
             &emitter,
             epoch,
             "emoji",
             token,
             &reset_json,
-        );
+        ).await;
 
         let end_batch = Envelope::wrap(ResultsBatch::End);
         let end_json = serde_json::to_string(&end_batch).unwrap();
@@ -83,7 +84,7 @@ impl EngineBus {
             "emoji",
             token,
             &end_json,
-        );
+        ).await;
 
         token
     }
@@ -99,7 +100,8 @@ impl EngineBus {
         args_json: &str,
         #[zbus(signal_emitter)]
         emitter: SignalEmitter<'_>,
-    ) { /* no-op for stub */
+    ) {
+        dbg!("Called request_preview with args: {}", args_json);
         let args: Envelope<serde_json::Value> = serde_json::from_str(args_json).unwrap_or_else(|_| Envelope { v: "1.0".into(), data: json!({}) });
         let epoch = args.data.get("epoch").and_then(|v| v.as_u64()).unwrap_or(self.epoch.load(std::sync::atomic::Ordering::SeqCst));
         let key = args.data.get("key").and_then(|v| v.as_str()).unwrap_or("");

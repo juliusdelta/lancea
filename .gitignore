@@ -2,6 +2,7 @@
 # Will contain the main compiled binary and other build artifacts
 target/
 engine/crates/**/target/
+ui/build/
 
 # Cargo.lock should be committed for applications to ensure reproducible builds,
 # but can be ignored for libraries if desired.

@@ -34,6 +34,7 @@ impl EmojiProvider {
     }
 
     pub fn search(&self, query: &str) -> Vec<ResultItem> {
+        dbg!("EmojiProvider::search called with query: {}", query);
         let q = query.trim().to_lowercase();
 
         let q = q
