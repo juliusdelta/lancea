@@ -11,17 +11,39 @@ EngineProxy::EngineProxy(QObject *parent)
     : QObject(parent),
       m_iface(SVC, PATH, IFACE, QDBusConnection::sessionBus(), this) {
 
-  QDBusConnection::sessionBus().connect(
+  bool ok = true;
+  ok &= QDBusConnection::sessionBus().connect(
       SVC, PATH, IFACE, "ResultsUpdated", this,
-      SLOT(resultsUpdated(ulonglong, QString, ulonglong, QString)));
-
-  QDBusConnection::sessionBus().connect(
+      SLOT(handleResultsUpdated(qulonglong, QString, qulonglong, QString)));
+  ok &= QDBusConnection::sessionBus().connect(
       SVC, PATH, IFACE, "PreviewUpdated", this,
-      SLOT(previewUpdated(ulonglong, QString, QString, QString)));
-
-  QDBusConnection::sessionBus().connect(
+      SLOT(handlePreviewUpdated(qulonglong, QString, QString, QString)));
+  ok &= QDBusConnection::sessionBus().connect(
       SVC, PATH, IFACE, "ProviderError", this,
-      SLOT(providerError(ulonglong, QString, QString)));
+      SLOT(handleProviderError(qulonglong, QString, QString)));
+  if (!ok) {
+    qWarning() << "EngineProxy: one or more DBus signal connections failed";
+  }
+}
+
+void EngineProxy::handleResultsUpdated(qulonglong epoch,
+                                       const QString &providerId,
+                                       qulonglong token,
+                                       const QString &batchJson) {
+  emit resultsUpdated(epoch, providerId, token, batchJson);
+}
+
+void EngineProxy::handlePreviewUpdated(qulonglong epoch,
+                                       const QString &providerId,
+                                       const QString &resultKey,
+                                       const QString &previewJson) {
+  emit previewUpdated(epoch, providerId, resultKey, previewJson);
+}
+
+void EngineProxy::handleProviderError(qulonglong epoch,
+                                      const QString &providerId,
+                                      const QString &errJson) {
+  emit providerError(epoch, providerId, errJson);
 }
 
 QString EngineProxy::resolveCommand(const QString &text) {

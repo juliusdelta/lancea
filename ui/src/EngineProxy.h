@@ -14,11 +14,21 @@ public:
   Q_INVOKABLE QString execute(const QString &actionId, const QString &key);
 
 signals:
-  void ResultsUpdated(qulonglong epoch, QString providerId, qulonglong token,
+  void resultsUpdated(qulonglong epoch, QString providerId, qulonglong token,
                       QString batchJson);
-  void PreviewUpdated(qulonglong epoch, QString providerId, QString resultKey,
+  void previewUpdated(qulonglong epoch, QString providerId, QString resultKey,
                       QString previewJson);
-  void ProviderError(qulonglong epoch, QString providerId, QString errJson);
+  void providerError(qulonglong epoch, QString providerId, QString errJson);
+
+private slots:
+  // These receive D-Bus signals and re-emit the Qt signals above
+  void handleResultsUpdated(qulonglong epoch, const QString &providerId,
+                            qulonglong token, const QString &batchJson);
+  void handlePreviewUpdated(qulonglong epoch, const QString &providerId,
+                            const QString &resultKey,
+                            const QString &previewJson);
+  void handleProviderError(qulonglong epoch, const QString &providerId,
+                           const QString &errJson);
 
 private:
   QDBusInterface m_iface;

@@ -57,7 +57,7 @@ impl EngineBus {
         #[zbus(signal_emitter)]
         emitter: SignalEmitter<'_>,
     ) -> u64 {
-        dbg!("Called search with args: {}", args_json);
+        dbg!("[EngineBus#search] - Called search with args: {}", args_json);
         let args: Envelope<serde_json::Value> = serde_json::from_str(args_json).unwrap_or_else(|_| Envelope { v: "1.0".into(), data: json!({}) });
         let text = args.data.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
         let epoch = args.data.get("epoch").and_then(|v| v.as_u64()).unwrap_or_else(|| self.next_epoch());
@@ -65,9 +65,11 @@ impl EngineBus {
 
         let items: Vec<ResultItem> = self.emoji.search(&text);
 
+        dbg!("[EngineBus#search] - Found {} items for query '{}'", &items.len(), text);
         let reset_batch = Envelope::wrap(ResultsBatch::Reset { items });
         let reset_json = serde_json::to_string(&reset_batch).unwrap();
 
+        dbg!("[EngineBus#search] - Emitting ResultsUpdated / reset_batch for epoch {}", &epoch);
         let _ = Self::results_updated(
             &emitter,
             epoch,
@@ -78,6 +80,8 @@ impl EngineBus {
 
         let end_batch = Envelope::wrap(ResultsBatch::End);
         let end_json = serde_json::to_string(&end_batch).unwrap();
+
+        dbg!("[EngineBus#search] - Emitting ResultsUpdated / end_batch {}", &epoch);
         let _ = Self::results_updated(
             &emitter,
             epoch,
@@ -101,7 +105,7 @@ impl EngineBus {
         #[zbus(signal_emitter)]
         emitter: SignalEmitter<'_>,
     ) {
-        dbg!("Called request_preview with args: {}", args_json);
+        dbg!("[EngineBus#request_preview] - Called request_preview with args: {}", &args_json);
         let args: Envelope<serde_json::Value> = serde_json::from_str(args_json).unwrap_or_else(|_| Envelope { v: "1.0".into(), data: json!({}) });
         let epoch = args.data.get("epoch").and_then(|v| v.as_u64()).unwrap_or(self.epoch.load(std::sync::atomic::Ordering::SeqCst));
         let key = args.data.get("key").and_then(|v| v.as_str()).unwrap_or("");
@@ -111,6 +115,8 @@ impl EngineBus {
 
         if let Some(preview) = self.emoji.preview(key) {
             let preview_json = serde_json::to_string(&Envelope::wrap(preview)).unwrap();
+
+            dbg!("[EngineBus#request_preview] - Emitting PreviewUpdated with at epoch: {}", &epoch);
             let _ = Self::preview_updated(&emitter, epoch, "emoji", key, &preview_json).await;
         }
     }
@@ -120,6 +126,7 @@ impl EngineBus {
     /// args_json envelope data:
     /// { "providerId":"emoji", "actionId":"copy_glyph", "key":"emoji:joy" }
     fn execute(&self, args_json: &str) -> String {
+        dbg!("[EngineBus#execute] - Called execute with args: {}", args_json);
         let args: Envelope<serde_json::Value> = serde_json::from_str(args_json).unwrap_or_else(|_| Envelope { v: "1.0".into(), data: json!({}) });
         let action = args.data.get("action").and_then(|v| v.as_str()).unwrap_or("");
         let key = args.data.get("key").and_then(|v| v.as_str()).unwrap_or("");
@@ -136,6 +143,7 @@ impl EngineBus {
             Outcome { status: "error".into(), message: Some("Unknown action or key".into()) }
         };
 
+        dbg!("[EngineBus#execute] - Outcome: {:?}", &outcome);
         return serde_json::to_string(&Envelope::wrap(outcome)).unwrap()
     }
 

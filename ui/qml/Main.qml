@@ -87,7 +87,9 @@ Window {
         Keys.onUpPressed: { if (selectedIndex>0) selectedIndex -= 1 }
         Keys.onDownPressed: { if (selectedIndex<resultsModel.count-1) selectedIndex += 1 }
         onCurrentIndexChanged: {
+          console.log("onCurrentIndexChanged")
           if (currentItem && resultsModel.count>0) {
+            console.log("Item found: ", currentItem)
             const item = resultsModel.get(currentIndex);
             engineProxy.requestPreview(item.key, win.currentEpoch);
           }
