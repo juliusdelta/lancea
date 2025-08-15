@@ -36,8 +36,11 @@ impl EmojiProvider {
     pub fn search(&self, query: &str) -> Vec<ResultItem> {
         let q = query.trim().to_lowercase();
 
-        let q = q.strip_prefix("/emoji").or_else(|| q.strip_prefix("/em"))
-            .map(|s| s.trim()).unwrap_or(q.as_str());
+        let q = q
+            .strip_prefix("/emoji")
+            .or_else(|| q.strip_prefix("/em"))
+            .map(|s| s.trim())
+            .unwrap_or(q.as_str());
 
         let mut items: Vec<(f32, ResultItem)> = Vec::new();
         for rec in &self.data {
@@ -47,51 +50,55 @@ impl EmojiProvider {
                 score = Some(0.1);
             } else if rec.shortcodes.iter().any(|s| s == &q) {
                 score = Some(1.0);
-            }
-            else if rec.name.to_lowercase().starts_with(q) || rec.keywords.iter().any(|k| k.starts_with(q)) {
+            } else if rec.name.to_lowercase().starts_with(q)
+                || rec.keywords.iter().any(|k| k.starts_with(q))
+            {
                 score = Some(0.8);
-            } else if rec.name.to_lowercase().contains(&q) || rec.keywords.iter().any(|k| k.contains(&q)) {
+            } else if rec.name.to_lowercase().contains(&q)
+                || rec.keywords.iter().any(|k| k.contains(&q))
+            {
                 score = Some(0.4);
             }
 
             if let Some(s) = score {
                 items.push((
-                    s, 
+                    s,
                     ResultItem {
                         key: rec.key.clone(),
                         title: rec.name.clone(),
-                        providerId: "emoji".into(),
+                        provider_id: "emoji".into(),
                         score: s,
                         extras: Some(serde_json::json!({
                             "glyph": rec.glyph,
                             "shortcodes": rec.shortcodes.get(0),
                         })),
-                    }
+                    },
                 ))
             }
         }
 
-        items.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
-        .then_with(|| a.1.title.cmp(&b.1.title)));
+        items.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.1.title.cmp(&b.1.title))
+        });
 
-        return items.into_iter().map(|(_, ri)| ri).take(20).collect()
+        return items.into_iter().map(|(_, ri)| ri).take(20).collect();
     }
 
     pub fn preview(&self, key: &str) -> Option<Preview> {
-        return self.data.iter().find(|r| r.key == key).map(|rec| {
-            Preview {
-                previewKind: "card".into(),
-                data: serde_json::json!({
-                    "glyph": rec.glyph,
-                    "title": rec.name,
-                    "shortcodes": rec.shortcodes.get(0),
-                    "keywords": rec.keywords,
-                }),
-            }
-        })
+        return self.data.iter().find(|r| r.key == key).map(|rec| Preview {
+            preview_kind: "card".into(),
+            data: serde_json::json!({
+                "glyph": rec.glyph,
+                "title": rec.name,
+                "shortcodes": rec.shortcodes.get(0),
+                "keywords": rec.keywords,
+            }),
+        });
     }
 
     pub fn execute_copy_glyph(&self, key: &str) -> bool {
-        return self.data.iter().any(|r| r.key == key)
+        return self.data.iter().any(|r| r.key == key);
     }
 }
