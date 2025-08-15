@@ -1,0 +1,9 @@
+[workspace]
+members = [
+  "crates/model",
+  "crates/registry",
+  "crates/bus",
+  "crates/provider-emoji",
+  "crates/engined"
+]
+resolver = "2"
