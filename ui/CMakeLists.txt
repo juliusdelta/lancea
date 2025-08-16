@@ -14,6 +14,8 @@ add_executable(lancea-ui
   src/main.cpp
   src/EngineProxy.h
   src/EngineProxy.cpp
+  src/ClipboardProxy.h
+  src/AppProxy.h
 )
 
 # Bundle QML with the app

@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Qt.labs.platform as Platform
 import Lancea
+import Lancea.System
 
 Window {
   id: win
@@ -49,11 +50,11 @@ Window {
       onAccepted: {
         if (resultsModel.count > 0) {
           const item = resultsModel.get(selectedIndex);
-           // clipboard.text = item.extras?.glyph ?? "";
-          toast.text = "Copied " // + clipboard.text;
+          Clipboard.setText(item.extras?.glyph ?? "");
+          toast.text = "Copied " + item.extras?.glyph;
           toast.visible = true; toastTimer.restart();
           // also call execute if desired:
-          // engineProxy.execute("copy_glyph", item.key);
+          engineProxy.execute("copy_glyph", item.key);
         }
       }
     }
@@ -65,7 +66,6 @@ Window {
       onTriggered: {
         const t = input.text;
         if (!t.startsWith("/emoji")) return;
-        // Resolve then search
         engineProxy.resolveCommand(t);
         win.currentEpoch += 1;
         engineProxy.search(t, win.currentEpoch);
@@ -77,7 +77,6 @@ Window {
       Layout.fillHeight: true
       spacing: 12
 
-      // Results
       ListView {
         id: results
         Layout.fillWidth: true
@@ -87,9 +86,7 @@ Window {
         Keys.onUpPressed: { if (selectedIndex>0) selectedIndex -= 1 }
         Keys.onDownPressed: { if (selectedIndex<resultsModel.count-1) selectedIndex += 1 }
         onCurrentIndexChanged: {
-          console.log("onCurrentIndexChanged")
           if (currentItem && resultsModel.count>0) {
-            console.log("Item found: ", currentItem)
             const item = resultsModel.get(currentIndex);
             engineProxy.requestPreview(item.key, win.currentEpoch);
           }
