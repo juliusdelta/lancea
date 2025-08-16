@@ -10,8 +10,6 @@ Window {
   width: 640; height: 420; visible: true
   title: "Lancea — M0"
 
-  // Platform.Clipboard { id: clipboard } // simple cross‑platform clipboard
-
   property int currentEpoch: 0
   property int selectedIndex: 0
   ListModel { id: resultsModel }
@@ -65,7 +63,6 @@ Window {
       interval: 120; repeat: false; running: false
       onTriggered: {
         const t = input.text;
-        if (!t.startsWith("/emoji")) return;
         engineProxy.resolveCommand(t);
         win.currentEpoch += 1;
         engineProxy.search(t, win.currentEpoch);

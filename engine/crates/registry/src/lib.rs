@@ -8,9 +8,11 @@ impl CommandRegistry {
     }
 
     pub fn resolve(&self, text: &str) -> ResolvedCommand {
+        dbg!("[Registry#resolve] - query resolving with: {}", &text);
         let trimmed = text.trim();
 
         if trimmed.starts_with("/emoji") || trimmed.starts_with("/em") {
+            dbg!("[Registry#resolve] - query found with: {}", &trimmed);
             return ResolvedCommand {
                 matched: true,
                 provider_id: Some("emoji".to_string()),
