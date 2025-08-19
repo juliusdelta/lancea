@@ -86,11 +86,11 @@ void EngineProxy::requestPreview(const QString &key, quint64 epoch) {
                                      QJsonDocument::Compact)));
 }
 
-QString EngineProxy::execute(const QString &action, const QString &key) {
+QString EngineProxy::execute(const QString &action, const QString &providerId, const QString &key) {
   const QJsonObject env{
       {"v", "1.0"},
       {"data",
-       QJsonObject{{"providerId", "emoji"}, {"action", action}, {"key", key}}}};
+       QJsonObject{{"providerId", providerId}, {"action", action}, {"key", key}}}};
   QDBusReply<QString> reply = m_iface.call(
       "Execute",
       QString::fromUtf8(QJsonDocument(env).toJson(QJsonDocument::Compact)));

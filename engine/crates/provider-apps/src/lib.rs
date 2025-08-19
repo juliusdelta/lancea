@@ -84,7 +84,6 @@ impl AppsProvider {
             .map(|s| s.trim())
             .unwrap_or(&q);
 
-        dbg!("[AppsProvder#search - Search initiated with query: {}", &q);
 
         if q.is_empty() {
             return Vec::new();
@@ -111,7 +110,6 @@ impl AppsProvider {
                     .as_ref()
                     .map_or(false, |c| starts_with_token(c, &q))
             {
-                dbg!("Best found. Score of 1.0 emitted.");
                 best = Some(1.0);
             }
 
@@ -141,10 +139,6 @@ impl AppsProvider {
         let scored_results: Vec<ResultItem> =
             scored.into_iter().map(|(_, it)| it).take(25).collect();
 
-        dbg!(
-            "[AppsProvider#search] Found {} apps that scored.",
-            &scored_results.first().unwrap()
-        );
 
         return scored_results;
     }

@@ -14,6 +14,7 @@ Window {
 
     property int currentEpoch: 0
     property int selectedIndex: 0
+    property string providerId: ""
     ListModel {
         id: resultsModel
     }
@@ -55,12 +56,18 @@ Window {
             onAccepted: {
                 if (resultsModel.count > 0) {
                     const item = resultsModel.get(selectedIndex);
-                    Clipboard.setText(item.extras?.glyph ?? "");
-                    toast.text = "Copied " + item.extras?.glyph;
-                    toast.visible = true;
-                    toastTimer.restart();
-                    // also call execute if desired:
-                    engineProxy.execute("copy_glyph", item.key);
+                    const currentProviderId = win.providerId;
+
+                    if (currentProviderId === "emoji") {
+                        Clipboard.setText(item.extras?.glyph ?? "");
+                        toast.text = "Copied " + item.extras?.glyph;
+                        toast.visible = true;
+                        toastTimer.restart();
+                        // also call execute if desired:
+                        engineProxy.execute("copy_glyph", currentProviderId, item.key);
+                    } else {
+                        engineProxy.execute("launch", currentProviderId, item.key);
+                    }
                 }
             }
         }
@@ -79,7 +86,9 @@ Window {
                 const resolved = JSON.parse(resolvedJson).data;
                 const providerId = resolved.provider_id ?? "";
 
+                win.providerId = providerId;
                 win.currentEpoch += 1;
+
                 engineProxy.search(t, providerId, win.currentEpoch);
             }
         }

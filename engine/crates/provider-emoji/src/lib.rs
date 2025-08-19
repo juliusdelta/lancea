@@ -2,6 +2,8 @@ use anyhow::Result;
 use lancea_model::{Preview, ResultItem, Provider};
 use serde::Deserialize;
 
+const PROVIDER_ID: &str = "emoji";
+
 #[derive(Debug, Deserialize)]
 struct EmojiRec {
     key: String,
@@ -32,14 +34,12 @@ impl EmojiProvider {
     }
 
     pub fn search(&self, query: &str) -> Vec<ResultItem> {
-        dbg!("EmojiProvider::search called with query: {}", query);
-        let q = query.trim().to_lowercase();
-
+        let q = normalize_query(query);
         let q = q
             .strip_prefix("/emoji")
             .or_else(|| q.strip_prefix("/em"))
             .map(|s| s.trim())
-            .unwrap_or(q.as_str());
+            .unwrap_or(&q);
 
         let mut items: Vec<(f32, ResultItem)> = Vec::new();
         for rec in &self.data {
@@ -47,14 +47,14 @@ impl EmojiProvider {
 
             if q.is_empty() {
                 score = Some(0.1);
-            } else if rec.shortcodes.iter().any(|s| s == &q) {
+            } else if rec.shortcodes.iter().any(|s| normalize_string(s) == q) {
                 score = Some(1.0);
-            } else if rec.name.to_lowercase().starts_with(q)
-                || rec.keywords.iter().any(|k| k.starts_with(q))
+            } else if starts_with_normalized(&rec.name, &q)
+                || rec.keywords.iter().any(|k| starts_with_normalized(k, &q))
             {
                 score = Some(0.8);
-            } else if rec.name.to_lowercase().contains(&q)
-                || rec.keywords.iter().any(|k| k.contains(&q))
+            } else if contains_normalized(&rec.name, &q)
+                || rec.keywords.iter().any(|k| contains_normalized(k, &q))
             {
                 score = Some(0.4);
             }
@@ -65,7 +65,7 @@ impl EmojiProvider {
                     ResultItem {
                         key: rec.key.clone(),
                         title: rec.name.clone(),
-                        provider_id: "emoji".into(),
+                        provider_id: PROVIDER_ID.into(),
                         score: s,
                         extras: Some(serde_json::json!({
                             "glyph": rec.glyph,
@@ -97,14 +97,35 @@ impl EmojiProvider {
         });
     }
 
-    pub fn execute_copy_glyph(&self, key: &str) -> bool {
-        return self.data.iter().any(|r| r.key == key);
+    pub fn execute_copy_glyph(&self, key: &str) -> Result<bool> {
+        let found = self.data.iter().any(|r| r.key == key);
+        if found {
+            Ok(true)
+        } else {
+            anyhow::bail!("Emoji not found: {}", key)
+        }
     }
+}
+
+fn normalize_query(query: &str) -> String {
+    query.trim().to_lowercase()
+}
+
+fn normalize_string(s: &str) -> String {
+    s.trim().to_lowercase()
+}
+
+fn starts_with_normalized(haystack: &str, needle: &str) -> bool {
+    normalize_string(haystack).starts_with(needle)
+}
+
+fn contains_normalized(haystack: &str, needle: &str) -> bool {
+    normalize_string(haystack).contains(needle)
 }
 
 impl Provider for EmojiProvider {
     fn id(&self) -> &str {
-        "emoji"
+        PROVIDER_ID
     }
 
     fn search(&self, query: &str) -> Vec<ResultItem> {
@@ -117,8 +138,8 @@ impl Provider for EmojiProvider {
 
     fn execute(&self, action: &str, key: &str) -> bool {
         match action {
-            "copy_glyph" => self.execute_copy_glyph(key),
-            "copy_shortcode" => self.execute_copy_glyph(key),
+            "copy_glyph" => self.execute_copy_glyph(key).unwrap_or(false),
+            "copy_shortcode" => self.execute_copy_glyph(key).unwrap_or(false),
             _ => false,
         }
     }
