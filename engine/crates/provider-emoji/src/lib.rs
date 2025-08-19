@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lancea_model::{Preview, ResultItem};
+use lancea_model::{Preview, ResultItem, Provider};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -99,5 +99,27 @@ impl EmojiProvider {
 
     pub fn execute_copy_glyph(&self, key: &str) -> bool {
         return self.data.iter().any(|r| r.key == key);
+    }
+}
+
+impl Provider for EmojiProvider {
+    fn id(&self) -> &str {
+        "emoji"
+    }
+
+    fn search(&self, query: &str) -> Vec<ResultItem> {
+        self.search(query)
+    }
+
+    fn preview(&self, key: &str) -> Option<Preview> {
+        self.preview(key)
+    }
+
+    fn execute(&self, action: &str, key: &str) -> bool {
+        match action {
+            "copy_glyph" => self.execute_copy_glyph(key),
+            "copy_shortcode" => self.execute_copy_glyph(key),
+            _ => false,
+        }
     }
 }

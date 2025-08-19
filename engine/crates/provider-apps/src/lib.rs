@@ -4,7 +4,7 @@ use dirs;
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use ini::Ini;
-use lancea_model::{Preview, ResultItem};
+use lancea_model::{Preview, ResultItem, Provider};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
@@ -408,5 +408,26 @@ fn to_result_item(app: &AppRecord, score: f32) -> ResultItem {
         provider_id: PROVIDER_ID.into(),
         score,
         extras: Some(extras),
+    }
+}
+
+impl Provider for AppsProvider {
+    fn id(&self) -> &str {
+        PROVIDER_ID
+    }
+
+    fn search(&self, query: &str) -> Vec<ResultItem> {
+        self.search(query)
+    }
+
+    fn preview(&self, key: &str) -> Option<Preview> {
+        self.preview(key)
+    }
+
+    fn execute(&self, action: &str, key: &str) -> bool {
+        match action {
+            "launch" => self.execute_launch(key).is_ok(),
+            _ => false,
+        }
     }
 }

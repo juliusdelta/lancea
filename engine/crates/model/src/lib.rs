@@ -65,3 +65,10 @@ pub struct Outcome {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
+
+pub trait Provider: Send + Sync {
+    fn id(&self) -> &str;
+    fn search(&self, query: &str) -> Vec<ResultItem>;
+    fn preview(&self, key: &str) -> Option<Preview>;
+    fn execute(&self, action: &str, key: &str) -> bool;
+}
