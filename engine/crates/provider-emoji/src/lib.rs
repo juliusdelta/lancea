@@ -1,5 +1,3 @@
-//! Emoji provider (stub for M0; real data later).
-
 use anyhow::Result;
 use lancea_model::{Preview, ResultItem};
 use serde::Deserialize;

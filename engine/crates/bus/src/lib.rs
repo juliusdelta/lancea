@@ -4,16 +4,18 @@ use std::sync::atomic::AtomicU64;
 
 use anyhow::Result;
 use lancea_model::{Envelope, Outcome, ResolvedCommand, ResultItem, ResultsBatch};
+use lancea_provider_apps::AppsProvider;
 use lancea_provider_emoji::EmojiProvider;
 use lancea_registry::CommandRegistry;
 use serde_json::json;
 use tracing::{info, instrument};
-use zbus::{interface, connection};
-use zbus::object_server::{SignalEmitter};
+use zbus::object_server::SignalEmitter;
+use zbus::{connection, interface};
 
 pub struct EngineBus {
     registry: CommandRegistry,
     emoji: EmojiProvider,
+    apps: AppsProvider,
     epoch: AtomicU64,
 }
 
@@ -22,6 +24,7 @@ impl EngineBus {
         Self {
             registry: CommandRegistry::new(),
             emoji: EmojiProvider::new().expect("Failed to initialize EmojiProvider"),
+            apps: AppsProvider::new().expect("Apps scan"),
             epoch: AtomicU64::new(0),
         }
     }
@@ -33,7 +36,12 @@ impl EngineBus {
     fn parse_text_from_envelope(s: &str) -> String {
         serde_json::from_str::<Envelope<serde_json::Value>>(s)
             .ok()
-            .and_then(|e| e.data.get("text").and_then(|v| v.as_str()).map(|s| s.to_string()))
+            .and_then(|e| {
+                e.data
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            })
             .unwrap_or_default()
     }
 }
@@ -54,41 +62,71 @@ impl EngineBus {
     async fn search(
         &self,
         args_json: &str,
-        #[zbus(signal_emitter)]
-        emitter: SignalEmitter<'_>,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
     ) -> u64 {
-        dbg!("[EngineBus#search] - Called search with args: {}", args_json);
-        let args: Envelope<serde_json::Value> = serde_json::from_str(args_json).unwrap_or_else(|_| Envelope { v: "1.0".into(), data: json!({}) });
-        let text = args.data.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let epoch = args.data.get("epoch").and_then(|v| v.as_u64()).unwrap_or_else(|| self.next_epoch());
+        dbg!(
+            "[EngineBus#search] - Called search with args: {}",
+            args_json
+        );
+        let args: Envelope<serde_json::Value> =
+            serde_json::from_str(args_json).unwrap_or_else(|_| Envelope {
+                v: "1.0".into(),
+                data: json!({}),
+            });
+        let text = args
+            .data
+            .get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let epoch = args
+            .data
+            .get("epoch")
+            .and_then(|v| v.as_u64())
+            .unwrap_or_else(|| self.next_epoch());
+        let providers = args.data["providerIds"].clone();
+
+        dbg!(
+            "############[EngineBus#search] - provderIds: {}",
+            &providers
+        );
         let token = 1u64;
 
-        let items: Vec<ResultItem> = self.emoji.search(&text);
+        let items: Vec<ResultItem> = if providers[0] == "emoji" {
+            self.emoji.search(&text)
+        } else if providers[0] == "apps" {
+            dbg!(
+                "[EngineBus#search] - AppProvider resolved from command.",
+                &providers
+            );
+            self.apps.search(&text)
+        } else {
+            self.emoji.search(&text)
+        };
 
-        dbg!("[EngineBus#search] - Found {} items for query '{}'", &items.len(), text);
+        dbg!(
+            "[EngineBus#search] - Found {} items for query '{}'",
+            &items.len(),
+            text
+        );
         let reset_batch = Envelope::wrap(ResultsBatch::Reset { items });
         let reset_json = serde_json::to_string(&reset_batch).unwrap();
 
-        dbg!("[EngineBus#search] - Emitting ResultsUpdated / reset_batch for epoch {}", &epoch);
-        let _ = Self::results_updated(
-            &emitter,
-            epoch,
-            "emoji",
-            token,
-            &reset_json,
-        ).await;
+        dbg!(
+            "[EngineBus#search] - Emitting ResultsUpdated / reset_batch for epoch {}",
+            &epoch
+        );
+        let _ = Self::results_updated(&emitter, epoch, "emoji", token, &reset_json).await;
 
         let end_batch = Envelope::wrap(ResultsBatch::End);
         let end_json = serde_json::to_string(&end_batch).unwrap();
 
-        dbg!("[EngineBus#search] - Emitting ResultsUpdated / end_batch {}", &epoch);
-        let _ = Self::results_updated(
-            &emitter,
-            epoch,
-            "emoji",
-            token,
-            &end_json,
-        ).await;
+        dbg!(
+            "[EngineBus#search] - Emitting ResultsUpdated / end_batch {}",
+            &epoch
+        );
+        let _ =
+            Self::results_updated(&emitter, epoch, &providers.to_string(), token, &end_json).await;
 
         token
     }
@@ -102,12 +140,22 @@ impl EngineBus {
     async fn request_preview(
         &self,
         args_json: &str,
-        #[zbus(signal_emitter)]
-        emitter: SignalEmitter<'_>,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
     ) {
-        dbg!("[EngineBus#request_preview] - Called request_preview with args: {}", &args_json);
-        let args: Envelope<serde_json::Value> = serde_json::from_str(args_json).unwrap_or_else(|_| Envelope { v: "1.0".into(), data: json!({}) });
-        let epoch = args.data.get("epoch").and_then(|v| v.as_u64()).unwrap_or(self.epoch.load(std::sync::atomic::Ordering::SeqCst));
+        dbg!(
+            "[EngineBus#request_preview] - Called request_preview with args: {}",
+            &args_json
+        );
+        let args: Envelope<serde_json::Value> =
+            serde_json::from_str(args_json).unwrap_or_else(|_| Envelope {
+                v: "1.0".into(),
+                data: json!({}),
+            });
+        let epoch = args
+            .data
+            .get("epoch")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(self.epoch.load(std::sync::atomic::Ordering::SeqCst));
         let key = args.data.get("key").and_then(|v| v.as_str()).unwrap_or("");
         if key.is_empty() {
             return;
@@ -116,7 +164,10 @@ impl EngineBus {
         if let Some(preview) = self.emoji.preview(key) {
             let preview_json = serde_json::to_string(&Envelope::wrap(preview)).unwrap();
 
-            dbg!("[EngineBus#request_preview] - Emitting PreviewUpdated with at epoch: {}", &epoch);
+            dbg!(
+                "[EngineBus#request_preview] - Emitting PreviewUpdated with at epoch: {}",
+                &epoch
+            );
             let _ = Self::preview_updated(&emitter, epoch, "emoji", key, &preview_json).await;
         }
     }
@@ -126,9 +177,20 @@ impl EngineBus {
     /// args_json envelope data:
     /// { "providerId":"emoji", "actionId":"copy_glyph", "key":"emoji:joy" }
     fn execute(&self, args_json: &str) -> String {
-        dbg!("[EngineBus#execute] - Called execute with args: {}", args_json);
-        let args: Envelope<serde_json::Value> = serde_json::from_str(args_json).unwrap_or_else(|_| Envelope { v: "1.0".into(), data: json!({}) });
-        let action = args.data.get("action").and_then(|v| v.as_str()).unwrap_or("");
+        dbg!(
+            "[EngineBus#execute] - Called execute with args: {}",
+            args_json
+        );
+        let args: Envelope<serde_json::Value> =
+            serde_json::from_str(args_json).unwrap_or_else(|_| Envelope {
+                v: "1.0".into(),
+                data: json!({}),
+            });
+        let action = args
+            .data
+            .get("action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let key = args.data.get("key").and_then(|v| v.as_str()).unwrap_or("");
 
         let ok = match action {
@@ -138,19 +200,24 @@ impl EngineBus {
         };
 
         let outcome = if ok {
-            Outcome { status: "ok".into(), message: Some("Copied glyph requested".into()) }
+            Outcome {
+                status: "ok".into(),
+                message: Some("Copied glyph requested".into()),
+            }
         } else {
-            Outcome { status: "error".into(), message: Some("Unknown action or key".into()) }
+            Outcome {
+                status: "error".into(),
+                message: Some("Unknown action or key".into()),
+            }
         };
 
         dbg!("[EngineBus#execute] - Outcome: {:?}", &outcome);
-        return serde_json::to_string(&Envelope::wrap(outcome)).unwrap()
+        return serde_json::to_string(&Envelope::wrap(outcome)).unwrap();
     }
 
     #[zbus(signal)]
     async fn results_updated(
-        #[zbus(signal_emitter)]
-        emitter: &SignalEmitter<'_>,
+        #[zbus(signal_emitter)] emitter: &SignalEmitter<'_>,
         epoch: u64,
         provider_id: &str,
         token: u64,
@@ -159,8 +226,7 @@ impl EngineBus {
 
     #[zbus(signal)]
     async fn preview_updated(
-        #[zbus(signal_emitter)]
-        emitter: &SignalEmitter<'_>,
+        #[zbus(signal_emitter)] emitter: &SignalEmitter<'_>,
         epoch: u64,
         provider_id: &str,
         result_key: &str,
@@ -169,8 +235,7 @@ impl EngineBus {
 
     #[zbus(signal)]
     async fn preview_error(
-        #[zbus(signal_emitter)]
-        emitter: &SignalEmitter<'_>,
+        #[zbus(signal_emitter)] emitter: &SignalEmitter<'_>,
         epoch: u64,
         provider_id: &str,
         err_json: u64,

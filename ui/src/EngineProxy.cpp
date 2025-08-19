@@ -2,6 +2,7 @@
 #include <QDBusReply>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 
 static const char *SVC = "org.lancea.Engine1";
 static const char *PATH = "/org/lancea/Engine1";
@@ -55,10 +56,18 @@ QString EngineProxy::resolveCommand(const QString &text) {
   return reply.isValid() ? reply.value() : QString();
 }
 
-quint64 EngineProxy::search(const QString &text, quint64 epoch) {
-  QJsonObject data{{"text", text}};
+quint64 EngineProxy::search(const QString &text, const QString &providerId,
+                            quint64 epoch) {
+  QJsonObject data;
+  data.insert(QStringLiteral("text"), text);
+
+  QJsonArray providerIds;
+  providerIds.append(providerId);
+  data.insert(QStringLiteral("providerIds"), providerIds);
+
   if (epoch)
     data.insert("epoch", static_cast<qint64>(epoch)); // DBus maps to u64
+
   const QJsonObject env{{"v", "1.0"}, {"data", data}};
 
   QDBusReply<qulonglong> reply = m_iface.call(

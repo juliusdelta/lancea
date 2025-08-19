@@ -1,0 +1,17 @@
+[package]
+name = "lancea-provider-apps"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+lancea-model = { path = "../model" }
+walkdir = "2"
+rust-ini = "0.21"
+dirs = "6"
+unicode-normalization = "0.1"
+deunicode = "1"
+fuzzy-matcher = "0.3"

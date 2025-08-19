@@ -4,6 +4,7 @@ members = [
   "crates/registry",
   "crates/bus",
   "crates/provider-emoji",
-  "crates/engined"
+  "crates/engined",
+  "crates/provider-apps"
 ]
 resolver = "2"
