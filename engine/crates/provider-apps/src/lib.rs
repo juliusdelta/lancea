@@ -4,7 +4,7 @@ use dirs;
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use ini::Ini;
-use lancea_model::{Preview, ResultItem, Provider};
+use lancea_model::{Preview, Provider, ResultItem};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
@@ -84,7 +84,6 @@ impl AppsProvider {
             .map(|s| s.trim())
             .unwrap_or(&q);
 
-
         if q.is_empty() {
             return Vec::new();
         }
@@ -138,7 +137,6 @@ impl AppsProvider {
 
         let scored_results: Vec<ResultItem> =
             scored.into_iter().map(|(_, it)| it).take(25).collect();
-
 
         return scored_results;
     }
@@ -389,8 +387,9 @@ fn natord(a: &str, b: &str) -> std::cmp::Ordering {
 }
 
 fn to_result_item(app: &AppRecord, score: f32) -> ResultItem {
-    // let subtitle = app.subtitle().unwrap_or_default();
+    let subtitle = app.subtitle().unwrap_or_default();
     let extras = serde_json::json!({
+        "subtitle": subtitle,
         "desktopId": app.desktop_id,
         "iconRef": app.icon,
         "exec": app.exec,
